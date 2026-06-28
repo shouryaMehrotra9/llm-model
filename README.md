@@ -156,17 +156,57 @@ FastAPI Backend (port 5000)
     │
     ├─► Qwen Embedder (port 8081) ──► Dense Vector Search (PostgreSQL)
     │
-    ├─► Full-Text Search (PostgreSQL tsvector)
+    ├─► Full-Text Search (PostgreSQL tsvector / websearch_to_tsquery)
     │
-    ├─► RRF Fusion (combines dense + sparse results)
+    ├─► RRF Fusion (Reciprocal Rank Fusion — combines dense + sparse results)
     │
-    ├─► CRAG Grader (filters relevant chunks by similarity score)
-    │       ├─ score ≥ 0.55 → Correct  ✅
-    │       ├─ score ≥ 0.40 → Ambiguous ⚠️
-    │       └─ score < 0.40 → Incorrect ❌
+    ├─► CRAG Grader (evaluates each retrieved chunk by cosine similarity)
+    │       ├─ score ≥ 0.55 → Correct  ✅  (kept as context)
+    │       ├─ score ≥ 0.40 → Ambiguous ⚠️  (kept as context)
+    │       └─ score < 0.40 → Incorrect ❌  (discarded)
+    │
+    ├─► [If relevant chunks found] Refined context passed to LLM
+    │
+    ├─► [If NO relevant chunks] Corrective Fallback triggered
+    │       └─► Gemini answers from general legal knowledge
+    │           (response prefixed with disclaimer: "No matching documents found")
     │
     └─► Gemini 2.5 Flash (generates final answer)
 ```
+
+---
+
+## 🧠 CRAG Pipeline — How It Works
+
+This project implements a **Corrective Retrieval-Augmented Generation (CRAG)** pipeline — a smarter evolution of standard RAG.
+
+### Standard RAG vs CRAG
+
+| Feature | Standard RAG | CRAG (this project) |
+|---|---|---|
+| Retrieved chunks | All passed to LLM | Graded first, bad ones removed |
+| Irrelevant results | Confuse the LLM | Discarded automatically |
+| No matching docs | LLM hallucinates | Corrective fallback triggered |
+| Search method | Single method | Hybrid (dense + sparse via RRF) |
+
+### Step-by-Step CRAG Flow
+
+1. **Hybrid Retrieval**: The user's query is run against two independent search systems:
+   - **Dense search** — Qwen embeddings matched against stored chunk vectors
+   - **Sparse search** — PostgreSQL full-text search using `websearch_to_tsquery` with `OR` boolean logic
+
+2. **RRF Fusion**: Results from both searches are merged using **Reciprocal Rank Fusion**, balancing semantic and keyword relevance.
+
+3. **CRAG Grading**: Each retrieved chunk is scored by **cosine similarity** against the query embedding:
+   - `≥ 0.55` → **Correct** — highly relevant, kept
+   - `≥ 0.40` → **Ambiguous** — possibly relevant, kept
+   - `< 0.40` → **Incorrect** — irrelevant, discarded
+
+4. **Decision Gate**:
+   - ✅ If any correct/ambiguous chunks exist → LLM answers using only the filtered context
+   - ❌ If all chunks are incorrect → **Corrective Fallback**: LLM answers from its own general legal knowledge, with a clear disclaimer shown to the user
+
+5. **Answer Generation**: Gemini 2.5 Flash synthesises the final structured answer with citations.
 
 ---
 
