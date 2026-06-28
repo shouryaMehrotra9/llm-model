@@ -811,7 +811,7 @@ async def query_cases(payload: dict = Body(...)):
         similarity_map = {row[0]: row[1] for row in dense_results}
         
         # Step 4: Fusion using RRF
-        fused_ids = rrf(dense_ids, sparse_ids, k=60)[:5]
+        fused_ids = rrf(dense_ids, sparse_ids, k=60)[:10]
         
         if not fused_ids:
             # Fallback to answering using general legal knowledge rather than throwing a 404
@@ -910,7 +910,7 @@ async def query_cases(payload: dict = Body(...)):
             if sim >= 0.55:
                 grade = "correct"
                 crag_correct_count += 1
-            elif sim >= 0.40:
+            elif sim >= 0.25:
                 grade = "ambiguous"
                 crag_ambiguous_count += 1
             else:
@@ -990,32 +990,29 @@ async def query_cases(payload: dict = Body(...)):
         for idx, chunk in enumerate(crag_graded_chunks):
             # Use human-readable title, fallback to filename if title is missing
             display_name = chunk.get('title') or chunk['case_name']
+            summary_line = f"\n  [Summary: {chunk['summary']}]" if chunk.get('summary') else ""
             context_parts.append(
-                f"Excerpt {idx+1} (Case: {display_name}, Page: {chunk['page']}):\n{chunk['content']}"
+                f"[Excerpt {idx+1}] Case: {display_name} | Section: {chunk['section_role']} | Page: {chunk['page']}{summary_line}\n{chunk['content']}"
             )
-        context_text = "\n\n".join(context_parts)
+        context_text = "\n\n---\n\n".join(context_parts)
         
         system_prompt = (
-            "You are a legal research assistant. Answer the query by analyzing the case excerpts. "
-            "Your answer must be returned as a formal LEGAL RESEARCH REPORT using this exact structure:\n\n"
-            "LEGAL RESEARCH REPORT\n\n"
-            "1. SUMMARY OF INQUIRY\n"
-            "---------------------\n"
-            "[Brief overview of the legal question being analyzed]\n\n"
-            "2. KEY FINDINGS\n"
-            "---------------\n"
-            "[List bullet points of facts found in the documents, citing the case title and page number, e.g. - Fact description (Case Title, Page 3)]\n\n"
-            "3. DETAILED LEGAL ANALYSIS\n"
-            "--------------------------\n"
-            "[Thorough narrative analysis referencing the case title and page number for every claim, e.g. (Maneka Gandhi v. Union of India, Page 4)]\n\n"
-            "4. CONCLUSION\n"
-            "-------------\n"
-            "[Concluding findings based on the documents]\n\n"
-            "Rules:\n"
-            "- Answer using ONLY the provided case excerpts. Do not invent facts, names, dates, or amounts.\n"
-            "- Always cite using the human-readable case title, NOT the filename.\n"
-            "- If the answer is not in the excerpts, say: Not found in retrieved documents.\n"
-            "- Maintain an objective, professional legal research tone."
+            "You are an expert Indian legal research assistant with deep knowledge of constitutional law, IPC, CrPC, and Supreme Court jurisprudence.\n\n"
+            "You will be given excerpts from legal documents retrieved from a database. Your task is to answer the user's legal question "
+            "as thoroughly and accurately as possible using these excerpts as your primary source of truth.\n\n"
+            "INSTRUCTIONS:\n"
+            "1. Read ALL provided excerpts carefully before answering.\n"
+            "2. Synthesise information across multiple excerpts to form a complete answer.\n"
+            "3. For every factual claim or legal finding, cite the case title and page number in parentheses, e.g. (Kesavananda Bharati v. State of Kerala, Page 5).\n"
+            "4. If a concept appears in multiple excerpts, mention all of them.\n"
+            "5. Structure your answer in clear sections:\n"
+            "   - OVERVIEW: 2-3 sentences summarising what the documents say about the query.\n"
+            "   - KEY LEGAL FINDINGS: Bullet points of the most important facts, holdings, or provisions found.\n"
+            "   - DETAILED ANALYSIS: Thorough paragraph-form analysis drawing from the excerpts.\n"
+            "   - CONCLUSION: A clear, direct answer to the user's question.\n"
+            "6. Do NOT say 'Not found in retrieved documents' unless you have genuinely exhausted all excerpts.\n"
+            "7. Do NOT make up facts, dates, names, or amounts not present in the excerpts.\n"
+            "8. Write in a professional legal tone — precise, analytical, and well-organised."
         )
         
         try:
