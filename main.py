@@ -988,8 +988,10 @@ async def query_cases(payload: dict = Body(...)):
         client = genai.Client(api_key=api_key)
         context_parts = []
         for idx, chunk in enumerate(crag_graded_chunks):
+            # Use human-readable title, fallback to filename if title is missing
+            display_name = chunk.get('title') or chunk['case_name']
             context_parts.append(
-                f"Excerpt {idx+1} (Source: {chunk['case_name']}, Page: {chunk['page']}):\n{chunk['content']}"
+                f"Excerpt {idx+1} (Case: {display_name}, Page: {chunk['page']}):\n{chunk['content']}"
             )
         context_text = "\n\n".join(context_parts)
         
@@ -1002,15 +1004,16 @@ async def query_cases(payload: dict = Body(...)):
             "[Brief overview of the legal question being analyzed]\n\n"
             "2. KEY FINDINGS\n"
             "---------------\n"
-            "[List bullet points of facts found in the documents, citing source case name and page numbers, e.g. - Fact description (Source: case_name, Page page_num)]\n\n"
+            "[List bullet points of facts found in the documents, citing the case title and page number, e.g. - Fact description (Case Title, Page 3)]\n\n"
             "3. DETAILED LEGAL ANALYSIS\n"
             "--------------------------\n"
-            "[Thorough narrative analysis of the question, referencing and citing the specific case name and page number for every single claim made, e.g. (johnson_v_smith.pdf, Page 1)]\n\n"
+            "[Thorough narrative analysis referencing the case title and page number for every claim, e.g. (Maneka Gandhi v. Union of India, Page 4)]\n\n"
             "4. CONCLUSION\n"
             "-------------\n"
             "[Concluding findings based on the documents]\n\n"
             "Rules:\n"
             "- Answer using ONLY the provided case excerpts. Do not invent facts, names, dates, or amounts.\n"
+            "- Always cite using the human-readable case title, NOT the filename.\n"
             "- If the answer is not in the excerpts, say: Not found in retrieved documents.\n"
             "- Maintain an objective, professional legal research tone."
         )
