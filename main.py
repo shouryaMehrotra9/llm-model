@@ -15,6 +15,9 @@ from contextlib import contextmanager
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
+# Import BM25 for sparse re-ranking
+from rank_bm25 import BM25Okapi
+
 # Import google-genai SDK
 from google import genai
 from google.genai import types
@@ -505,6 +508,55 @@ def rrf(dense_ids, sparse_ids, k=60):
         scores[cid] = scores.get(cid, 0) + 1 / (k + rank + 1)
     return sorted(scores, key=scores.get, reverse=True)
 
+def bm25_search(question: str, top_k: int = 20) -> list[int]:
+    """
+    Two-stage BM25 search:
+    Stage 1: PostgreSQL FTS pre-filter (websearch_to_tsquery) — gets up to 50 candidate chunk IDs fast.
+    Stage 2: BM25Okapi re-ranking — applies true BM25 scoring on the candidate chunks' actual content.
+    Returns a list of chunk IDs ranked by BM25 score (best first).
+    """
+    try:
+        websearch_query = to_websearch_or(question)
+        if not websearch_query:
+            return []
+
+        # Stage 1: FTS pre-filter — fetch candidate chunk IDs + content
+        with db_cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, content
+                FROM legal_chunks
+                WHERE content_tsv @@ websearch_to_tsquery('english', %s)
+                LIMIT 50;
+                """,
+                (websearch_query,)
+            )
+            rows = cur.fetchall()
+
+        if not rows:
+            return []
+
+        candidate_ids = [row[0] for row in rows]
+        candidate_texts = [row[1] for row in rows]
+
+        # Stage 2: BM25 re-ranking on candidate content
+        tokenized_corpus = [doc.lower().split() for doc in candidate_texts]
+        tokenized_query = question.lower().split()
+
+        bm25 = BM25Okapi(tokenized_corpus)
+        scores = bm25.get_scores(tokenized_query)
+
+        # Rank candidates by BM25 score (descending)
+        ranked_indices = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)
+        ranked_ids = [candidate_ids[i] for i in ranked_indices[:top_k] if scores[i] > 0]
+
+        logger.info(f"BM25 search returned {len(ranked_ids)} results from {len(candidate_ids)} FTS candidates.")
+        return ranked_ids
+
+    except Exception as e:
+        logger.error(f"BM25 search error: {e}")
+        return []
+
 @app.get("/", response_class=HTMLResponse)
 def get_frontend():
     index_path = os.path.join(".", "index.html")
@@ -746,27 +798,13 @@ async def query_cases(payload: dict = Body(...)):
             except Exception as e:
                 logger.error(f"Dense search error: {e}")
                 
-        # Step 3: Sparse BM25 search (TSVector)
+        # Step 3: BM25 sparse search (two-stage: FTS pre-filter + BM25Okapi re-ranking)
         sparse_results = []
         try:
-            websearch_query = to_websearch_or(question)
-            if websearch_query:
-                with db_cursor() as cur:
-                    cur.execute(
-                        """
-                        SELECT id FROM (
-                            SELECT id, ts_rank_cd(content_tsv, websearch_to_tsquery('english', %s)) AS bm25_score
-                            FROM legal_chunks
-                            WHERE content_tsv @@ websearch_to_tsquery('english', %s)
-                            ORDER BY bm25_score DESC
-                            LIMIT 20
-                        ) sub;
-                        """,
-                        (websearch_query, websearch_query)
-                    )
-                    sparse_results = cur.fetchall()
+            bm25_ids = bm25_search(question, top_k=20)
+            sparse_results = [(cid,) for cid in bm25_ids]
         except Exception as e:
-            logger.error(f"Sparse search error: {e}")
+            logger.error(f"BM25 search error: {e}")
             
         dense_ids = [row[0] for row in dense_results]
         sparse_ids = [row[0] for row in sparse_results]
