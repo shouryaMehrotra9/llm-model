@@ -1,0 +1,1243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Court Case Q&A - RAG System</title>
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <style>
+    /* Reset & Core Design System */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Outfit', sans-serif;
+    }
+    
+    :root {
+      --bg-dark: #0b0f19;
+      --bg-gradient: linear-gradient(135deg, #0b0f19 0%, #111827 50%, #1e1b4b 100%);
+      --glass-bg: rgba(17, 24, 39, 0.7);
+      --glass-border: rgba(255, 255, 255, 0.08);
+      --glass-border-focus: rgba(99, 102, 241, 0.4);
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --accent-blue: #3b82f6;
+      --accent-indigo: #6366f1;
+      --accent-cyan: #06b6d4;
+      --color-green: #10b981;
+      --color-yellow: #f59e0b;
+      --color-red: #ef4444;
+      
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+      --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.2);
+    }
+    
+    body {
+      background: var(--bg-gradient);
+      background-attachment: fixed;
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2.5rem 1.5rem;
+      overflow-x: hidden;
+    }
+    
+    /* Container & Wrapper */
+    .app-container {
+      width: 100%;
+      max-width: 1000px;
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+    
+    /* Header Styles */
+    header {
+      text-align: center;
+      margin-bottom: 0.5rem;
+      animation: fadeInDown 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    
+    h1 {
+      font-size: 3rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #38bdf8 0%, #818cf8 50%, #c084fc 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.025em;
+      margin-bottom: 0.5rem;
+    }
+    
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 1.15rem;
+      font-weight: 400;
+    }
+    
+    /* Glassmorphism Card Style */
+    .card {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      box-shadow: var(--shadow-lg);
+      padding: 2rem;
+      transition: all 0.3s ease;
+    }
+    
+    .card:hover {
+      border-color: rgba(99, 102, 241, 0.2);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 0 15px rgba(99, 102, 241, 0.05);
+    }
+    
+    /* Upload Zone */
+    .upload-zone {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border: 2px dashed rgba(255, 255, 255, 0.15);
+      border-radius: 12px;
+      padding: 3rem 2rem;
+      cursor: pointer;
+      background: rgba(255, 255, 255, 0.02);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      text-align: center;
+    }
+    
+    .upload-zone.dragover {
+      border-color: var(--accent-indigo);
+      background: rgba(99, 102, 241, 0.08);
+      box-shadow: var(--shadow-glow);
+      transform: scale(1.01);
+    }
+    
+    .upload-icon {
+      width: 48px;
+      height: 48px;
+      margin-bottom: 1rem;
+      color: var(--accent-indigo);
+      transition: transform 0.3s ease;
+    }
+    
+    .upload-zone:hover .upload-icon {
+      transform: translateY(-4px);
+    }
+    
+    .upload-text {
+      font-size: 1.1rem;
+      font-weight: 500;
+      margin-bottom: 0.5rem;
+    }
+    
+    .upload-subtext {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+    }
+    
+    #file-input {
+      display: none;
+    }
+    
+    /* File chips lists */
+    .files-container {
+      margin-top: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    
+    .section-title {
+      font-size: 0.875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+    
+    .chips-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+    
+    .file-chip {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--glass-border);
+      padding: 0.5rem 0.875rem;
+      border-radius: 9999px;
+      font-size: 0.875rem;
+      transition: all 0.2s ease;
+      text-decoration: none;
+      color: inherit;
+      cursor: pointer;
+    }
+    
+    .file-chip:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+    
+    .file-icon {
+      color: #f43f5e;
+      flex-shrink: 0;
+    }
+    
+    .file-info {
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .file-name {
+      font-weight: 500;
+      max-width: 180px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    
+    .file-pages {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+    
+    .reset-btn-container {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 1rem;
+    }
+    
+    .btn-secondary {
+      background: transparent;
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      color: var(--color-red);
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.2s ease;
+    }
+    
+    .btn-secondary:hover {
+      background: rgba(239, 68, 68, 0.08);
+      border-color: var(--color-red);
+    }
+    
+    /* Query section styles */
+    .query-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+    
+    .search-bar-container {
+      display: flex;
+      gap: 0.75rem;
+      width: 100%;
+    }
+    
+    .search-input-wrapper {
+      position: relative;
+      flex-grow: 1;
+    }
+    
+    .search-input {
+      width: 100%;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--glass-border);
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      padding-left: 2.75rem;
+      color: var(--text-main);
+      font-size: 1rem;
+      outline: none;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    
+    .search-input:focus {
+      border-color: var(--accent-indigo);
+      box-shadow: 0 0 15px rgba(99, 102, 241, 0.15);
+      background: rgba(15, 23, 42, 0.8);
+    }
+    
+    .search-icon-svg {
+      position: absolute;
+      left: 1rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      pointer-events: none;
+      width: 18px;
+      height: 18px;
+    }
+    
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-indigo) 0%, var(--accent-blue) 100%);
+      border: none;
+      color: white;
+      padding: 0 1.75rem;
+      border-radius: 12px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
+      filter: brightness(1.05);
+    }
+    
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+    
+    .btn-primary:disabled {
+      background: #374151;
+      color: #9ca3af;
+      cursor: not-allowed;
+      box-shadow: none;
+      transform: none;
+    }
+    
+    /* Sample questions */
+    .samples-container {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    
+    .samples-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    
+    .sample-btn {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      color: var(--text-muted);
+      padding: 0.5rem 0.875rem;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    .sample-btn:hover {
+      background: rgba(99, 102, 241, 0.1);
+      border-color: rgba(99, 102, 241, 0.3);
+      color: var(--text-main);
+    }
+    
+    /* Results Loading State */
+    .skeleton-loader {
+      display: none;
+      flex-direction: column;
+      gap: 1.5rem;
+      animation: pulse 1.5s infinite ease-in-out;
+    }
+    
+    .skeleton-bar {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 4px;
+    }
+    
+    .skeleton-title {
+      height: 24px;
+      width: 40%;
+    }
+    
+    .skeleton-block {
+      height: 120px;
+      width: 100%;
+    }
+    
+    .skeleton-metrics {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+    }
+    
+    .skeleton-metric-card {
+      height: 80px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+    }
+    
+    @keyframes pulse {
+      0% { opacity: 0.6; }
+      50% { opacity: 0.3; }
+      100% { opacity: 0.6; }
+    }
+    
+    /* Results Container styling */
+    .results-container {
+      display: none; /* Shown dynamically */
+      flex-direction: column;
+      gap: 1.5rem;
+      animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    
+    /* Metric Cards Grid */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.5rem;
+    }
+    
+    .metric-card {
+      background: rgba(17, 24, 39, 0.5);
+      border: 1px solid var(--glass-border);
+      border-radius: 14px;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .metric-label {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+    
+    .metric-value {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    
+    .progress-track {
+      background: rgba(255, 255, 255, 0.08);
+      height: 6px;
+      border-radius: 9999px;
+      width: 100%;
+      margin-top: 0.25rem;
+      overflow: hidden;
+    }
+    
+    .progress-bar {
+      height: 100%;
+      border-radius: 9999px;
+      width: 0%;
+      transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.5s ease;
+    }
+    
+    .progress-bar.green {
+      background-color: var(--color-green);
+    }
+    
+    .progress-bar.yellow {
+      background-color: var(--color-yellow);
+    }
+    
+    .progress-bar.red {
+      background-color: var(--color-red);
+    }
+    
+    /* Warning Banner */
+    .warning-banner {
+      display: none;
+      align-items: center;
+      gap: 0.75rem;
+      background: rgba(245, 158, 11, 0.1);
+      border: 1px solid rgba(245, 158, 11, 0.25);
+      border-left: 4px solid var(--color-yellow);
+      border-radius: 8px;
+      padding: 1rem;
+      color: #ffedd5;
+      font-size: 0.95rem;
+      line-height: 1.4;
+      animation: shake 0.5s ease;
+    }
+    
+    .warning-icon {
+      color: var(--color-yellow);
+      flex-shrink: 0;
+      width: 24px;
+      height: 24px;
+    }
+    
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-4px); }
+      40%, 80% { transform: translateX(4px); }
+    }
+    
+    /* Answer Card */
+    .answer-card {
+      position: relative;
+    }
+    
+    .answer-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.25rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      padding-bottom: 0.75rem;
+    }
+    
+    .answer-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+    
+    .badge {
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+      padding: 0.375rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    
+    .badge.low {
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      color: var(--color-green);
+    }
+    
+    .badge.medium {
+      background: rgba(245, 158, 11, 0.12);
+      border: 1px solid rgba(245, 158, 11, 0.2);
+      color: var(--color-yellow);
+    }
+    
+    .badge.high {
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      color: var(--color-red);
+    }
+    
+    .badge svg {
+      width: 14px;
+      height: 14px;
+    }
+    
+    .answer-text {
+      line-height: 1.65;
+      font-size: 1.05rem;
+      white-space: pre-line;
+      color: #e5e7eb;
+    }
+    
+    /* Source Chips */
+    .sources-section {
+      margin-top: 1.5rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      padding-top: 1rem;
+    }
+    
+    .source-chip {
+      background: rgba(99, 102, 241, 0.06);
+      border: 1px solid rgba(99, 102, 241, 0.15);
+      color: #a5b4fc;
+      padding: 0.375rem 0.75rem;
+      border-radius: 6px;
+      font-size: 0.825rem;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+    
+    .source-chip:hover {
+      background: rgba(99, 102, 241, 0.15);
+      border-color: rgba(99, 102, 241, 0.35);
+      color: #c7d2fe;
+    }
+    
+    /* Accordion - Chunks Detail */
+    .accordion {
+      border: 1px solid var(--glass-border);
+      border-radius: 12px;
+      overflow: hidden;
+      background: rgba(17, 24, 39, 0.3);
+    }
+    
+    .accordion-header {
+      padding: 1.25rem 1.5rem;
+      background: rgba(17, 24, 39, 0.5);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.2s ease;
+    }
+    
+    .accordion-header:hover {
+      background: rgba(17, 24, 39, 0.7);
+    }
+    
+    .accordion-title {
+      font-weight: 600;
+      font-size: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .accordion-icon {
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      color: var(--text-muted);
+      width: 20px;
+      height: 20px;
+    }
+    
+    .accordion.open .accordion-icon {
+      transform: rotate(180deg);
+    }
+    
+    .accordion-content {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    
+    .accordion.open .accordion-content {
+      max-height: 2000px;
+    }
+    
+    .chunks-list {
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+    
+    .chunk-item {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    
+    .chunk-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.825rem;
+      border-bottom: 1px dashed rgba(255, 255, 255, 0.05);
+      padding-bottom: 0.5rem;
+    }
+    
+    .chunk-source {
+      font-weight: 500;
+      color: var(--text-main);
+    }
+    
+    .chunk-score {
+      font-weight: 600;
+    }
+    
+    .chunk-score.green { color: var(--color-green); }
+    .chunk-score.yellow { color: var(--color-yellow); }
+    .chunk-score.red { color: var(--color-red); }
+    
+    .chunk-preview {
+      font-size: 0.9rem;
+      line-height: 1.5;
+      color: var(--text-muted);
+      white-space: pre-wrap;
+      font-family: inherit;
+    }
+    
+    /* Loading overlay */
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(11, 15, 25, 0.85);
+      backdrop-filter: blur(8px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 1.5rem;
+      z-index: 1000;
+      animation: fadeIn 0.3s ease;
+    }
+    
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 3px solid rgba(99, 102, 241, 0.2);
+      border-top-color: var(--accent-indigo);
+      border-radius: 50%;
+      animation: spin 1s infinite linear;
+    }
+    
+    .loading-text {
+      font-size: 1.15rem;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+    }
+    
+    /* Toast Notifications */
+    .toast-container {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      z-index: 1001;
+    }
+    
+    .toast {
+      background: rgba(17, 24, 39, 0.95);
+      border: 1px solid var(--glass-border);
+      border-left: 4px solid var(--accent-indigo);
+      color: var(--text-main);
+      padding: 1rem 1.25rem;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      box-shadow: var(--shadow-lg);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      min-width: 300px;
+      transform: translateX(120%);
+      transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    
+    .toast.show {
+      transform: translateX(0);
+    }
+    
+    .toast.error {
+      border-left-color: var(--color-red);
+    }
+    
+    .toast.success {
+      border-left-color: var(--color-green);
+    }
+    
+    /* Animations */
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(12px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    @keyframes fadeInDown {
+      from {
+        opacity: 0;
+        transform: translateY(-20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    /* Responsive adjustment */
+    @media (max-width: 640px) {
+      body {
+        padding: 1.5rem 1rem;
+      }
+      h1 {
+        font-size: 2.25rem;
+      }
+      .skeleton-metrics, .metrics-grid {
+        grid-template-columns: 1fr;
+      }
+      .search-bar-container {
+        flex-direction: column;
+      }
+      .btn-primary {
+        padding: 1rem;
+        justify-content: center;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app-container">
+    
+    <!-- Title -->
+    <header>
+      <h1>Court Case Q&A</h1>
+      <p class="subtitle">Ask questions across your uploaded cases using local retrieval-augmented generation</p>
+    </header>
+    
+    <!-- Available Cases Card -->
+    <div class="card" id="files-section" style="display: none;">
+      <div class="section-title">Available Cases in Database (<span id="file-count">0</span>)</div>
+      <div class="chips-grid" id="chips-grid"></div>
+    </div>
+    
+    <!-- Query Card -->
+    <div class="card">
+      <div class="section-title">Query Console</div>
+      <div class="query-wrapper">
+        <div class="search-bar-container">
+          <div class="search-input-wrapper">
+            <svg class="search-icon-svg" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+            <input type="text" class="search-input" id="query-input" placeholder="Type your question about the uploaded cases...">
+          </div>
+          <button class="btn-primary" id="ask-btn">
+            <span>Ask</span>
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+            </svg>
+          </button>
+        </div>
+        
+        <!-- Sample queries -->
+        <div class="samples-container">
+          <div style="font-size: 0.825rem; color: var(--text-muted); font-weight: 500;">Sample Queries:</div>
+          <div class="samples-grid">
+            <button class="sample-btn" data-query="What was the verdict?">What was the verdict?</button>
+            <button class="sample-btn" data-query="What damages were awarded?">What damages were awarded?</button>
+            <button class="sample-btn" data-query="Who was the plaintiff?">Who was the plaintiff?</button>
+            <button class="sample-btn" data-query="Was there a breach of contract?">Was there a breach of contract?</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Skeleton loader -->
+    <div class="card skeleton-loader" id="query-skeleton">
+      <div class="skeleton-bar skeleton-title"></div>
+      <div class="skeleton-metrics">
+        <div class="skeleton-metric-card"></div>
+        <div class="skeleton-metric-card"></div>
+        <div class="skeleton-metric-card"></div>
+      </div>
+      <div class="skeleton-bar skeleton-block"></div>
+    </div>
+    
+    <!-- Results Area -->
+    <div class="results-container" id="results-area">
+      
+      <!-- Metrics Row -->
+      <div class="metrics-grid">
+        <!-- Confidence -->
+        <div class="metric-card">
+          <div class="metric-label">Confidence</div>
+          <div class="metric-value" id="conf-val">0.0%</div>
+          <div class="progress-track">
+            <div class="progress-bar" id="conf-bar"></div>
+          </div>
+        </div>
+        <!-- Hallucination Risk -->
+        <div class="metric-card">
+          <div class="metric-label">Hallucination Risk</div>
+          <div class="metric-value" id="halluc-val">0.0%</div>
+          <div class="progress-track">
+            <div class="progress-bar" id="halluc-bar"></div>
+          </div>
+        </div>
+        <!-- Chunks Retrieved -->
+        <div class="metric-card">
+          <div class="metric-label">Chunks Retrieved</div>
+          <div class="metric-value" id="chunks-val">0</div>
+          <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">Top similarity matches</div>
+        </div>
+      </div>
+      
+      <!-- Warning Banner -->
+      <div class="warning-banner" id="hallucination-warning">
+        <svg class="warning-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+        </svg>
+        <span><strong>Attention:</strong> Hallucination risk is high (>25%). Please double-check details against the source documents below.</span>
+      </div>
+      
+      <!-- Generated Answer -->
+      <div class="card answer-card">
+        <div class="answer-header">
+          <div class="answer-title">System Answer</div>
+          <!-- Badge -->
+          <div id="risk-badge" class="badge">
+            <!-- Dynamically populated icon and text -->
+          </div>
+        </div>
+        
+        <div class="answer-text" id="answer-box"></div>
+        
+        <!-- Source chips section -->
+        <div class="sources-section">
+          <div style="font-size: 0.825rem; color: var(--text-muted); font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase;">Sources:</div>
+          <div class="chips-grid" id="sources-grid">
+            <!-- Dynamically populated source chips -->
+          </div>
+        </div>
+      </div>
+      
+      <!-- Accordion: Retrieved Chunks Detail -->
+      <div class="accordion" id="chunks-accordion">
+        <div class="accordion-header" id="accordion-toggle">
+          <div class="accordion-title">
+            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path>
+            </svg>
+            Retrieved Text Segments
+          </div>
+          <svg class="accordion-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+          </svg>
+        </div>
+        <div class="accordion-content">
+          <div class="chunks-list" id="chunks-list">
+            <!-- Dynamically populated chunks -->
+          </div>
+        </div>
+      </div>
+      
+    </div>
+    
+  </div>
+
+  <!-- Fullscreen Loading Overlay -->
+  <div class="loading-overlay" id="loading-screen">
+    <div class="spinner"></div>
+    <div class="loading-text" id="loading-text">Processing documents...</div>
+  </div>
+
+  <!-- Toast notifications -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- Icons library (SVGs for badge) -->
+  <script>
+    // SVG icons used in JS
+    const SHIELD_ICON = `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>`;
+    const WARNING_ICON = `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>`;
+    const ALERT_ICON = `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg>`;
+
+    // Frontend State & Handlers
+    const filesSection = document.getElementById('files-section');
+    const chipsGrid = document.getElementById('chips-grid');
+    const fileCountSpan = document.getElementById('file-count');
+    
+    const queryInput = document.getElementById('query-input');
+    const askBtn = document.getElementById('ask-btn');
+    const sampleBtns = document.querySelectorAll('.sample-btn');
+    
+    const querySkeleton = document.getElementById('query-skeleton');
+    const resultsArea = document.getElementById('results-area');
+    
+    const confVal = document.getElementById('conf-val');
+    const confBar = document.getElementById('conf-bar');
+    const hallucVal = document.getElementById('halluc-val');
+    const hallucBar = document.getElementById('halluc-bar');
+    const chunksVal = document.getElementById('chunks-val');
+    
+    const hallucinationWarning = document.getElementById('hallucination-warning');
+    const riskBadge = document.getElementById('risk-badge');
+    const answerBox = document.getElementById('answer-box');
+    const sourcesGrid = document.getElementById('sources-grid');
+    const chunksList = document.getElementById('chunks-list');
+    
+    const loadingScreen = document.getElementById('loading-screen');
+    const loadingText = document.getElementById('loading-text');
+    
+    const accordion = document.getElementById('chunks-accordion');
+    const accordionToggle = document.getElementById('accordion-toggle');
+
+    // Toast Notification helper
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.textContent = message;
+      container.appendChild(toast);
+      
+      // trigger show animation
+      setTimeout(() => toast.classList.add('show'), 10);
+      
+      // remove after 4 seconds
+      setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 400);
+      }, 4000);
+    }
+
+    // Toggle Accordion
+    accordionToggle.addEventListener('click', () => {
+      accordion.classList.toggle('open');
+    });
+
+    // Startup check: Load files list
+    async function loadFilesList() {
+      try {
+        const res = await fetch('/files');
+        const data = await res.json();
+        if (data.status === 'success' && data.files.length > 0) {
+          renderFileChips(data.files);
+        } else {
+          filesSection.style.display = 'none';
+        }
+      } catch (err) {
+        showToast('Error loading active case files.', 'error');
+      }
+    }
+
+    // Render File Chips
+    function renderFileChips(files) {
+      chipsGrid.innerHTML = '';
+      fileCountSpan.textContent = files.length;
+      
+      files.forEach(f => {
+        const chip = document.createElement('a');
+        chip.className = 'file-chip';
+        chip.href = `/pdf/${encodeURIComponent(f.case_name)}`;
+        chip.target = '_blank';
+        chip.innerHTML = `
+          <svg class="file-icon" width="16" height="16" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+            <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"></path>
+          </svg>
+          <div class="file-info">
+            <span class="file-name" title="${f.case_name}">${f.case_name}</span>
+            <span class="file-pages">${f.page_count} pages</span>
+          </div>
+        `;
+        chipsGrid.appendChild(chip);
+      });
+      
+      filesSection.style.display = 'block';
+    }
+
+
+
+    // Sample question buttons click handlers
+    sampleBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        queryInput.value = btn.getAttribute('data-query');
+        submitQuery();
+      });
+    });
+
+    // Ask button click handler
+    askBtn.addEventListener('click', submitQuery);
+    
+    // Enter key inside search bar
+    queryInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        submitQuery();
+      }
+    });
+
+    // Submit Query to backend
+    async function submitQuery() {
+      const question = queryInput.value.trim();
+      if (!question) {
+        showToast('Please type a question first.', 'info');
+        return;
+      }
+
+      // Hide previous results and show skeleton loader
+      resultsArea.style.display = 'none';
+      querySkeleton.style.display = 'flex';
+      askBtn.disabled = true;
+
+      try {
+        const res = await fetch('/query', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ question })
+        });
+        const data = await res.json();
+        
+        if (!res.ok) {
+          showToast(data.detail || 'An error occurred during query.', 'error');
+          querySkeleton.style.display = 'none';
+          askBtn.disabled = false;
+          return;
+        }
+
+        // Render Results
+        querySkeleton.style.display = 'none';
+        renderResults(data);
+        resultsArea.style.display = 'flex';
+      } catch (err) {
+        showToast('Network error while fetching query results.', 'error');
+        querySkeleton.style.display = 'none';
+      } finally {
+        askBtn.disabled = false;
+      }
+    }
+
+    // Render Query Results
+    function renderResults(data) {
+      // 1. Confidence Metrics Card
+      const conf = data.confidence;
+      confVal.textContent = `${conf.toFixed(1)}%`;
+      confBar.style.width = `${conf}%`;
+      confBar.className = 'progress-bar'; // reset
+      if (conf >= 80) {
+        confBar.classList.add('green');
+      } else if (conf >= 60) {
+        confBar.classList.add('yellow');
+      } else {
+        confBar.classList.add('red');
+      }
+
+      // 2. Hallucination Risk Metrics Card
+      const halluc = data.hallucination;
+      hallucVal.textContent = `${halluc.toFixed(1)}%`;
+      hallucBar.style.width = `${halluc}%`;
+      hallucBar.className = 'progress-bar'; // reset
+      if (halluc <= 10) {
+        hallucBar.classList.add('green');
+      } else if (halluc <= 25) {
+        hallucBar.classList.add('yellow');
+      } else {
+        hallucBar.classList.add('red');
+      }
+
+      // 3. Chunks Retrieved Count
+      chunksVal.textContent = data.chunks ? data.chunks.length : 0;
+
+      // 4. Hallucination Warning Banner (>25%)
+      if (halluc > 25 && data.status !== 'insufficient_confidence') {
+        hallucinationWarning.style.display = 'flex';
+      } else {
+        hallucinationWarning.style.display = 'none';
+      }
+
+      // 5. Hallucination Badge
+      riskBadge.className = 'badge'; // reset
+      if (halluc <= 10) {
+        riskBadge.classList.add('low');
+        riskBadge.innerHTML = `${SHIELD_ICON} Low Risk`;
+      } else if (halluc <= 25) {
+        riskBadge.classList.add('medium');
+        riskBadge.innerHTML = `${WARNING_ICON} Med Risk`;
+      } else {
+        riskBadge.classList.add('high');
+        riskBadge.innerHTML = `${ALERT_ICON} High Risk`;
+      }
+
+      // 6. System Answer Text
+      answerBox.textContent = data.answer;
+
+      // 7. Source Chips
+      sourcesGrid.innerHTML = '';
+      if (data.sources && data.sources.length > 0) {
+        data.sources.forEach(src => {
+          const chip = document.createElement('a');
+          chip.className = 'source-chip';
+          chip.href = `/pdf/${encodeURIComponent(src.case_name)}#page=${src.page}`;
+          chip.target = '_blank';
+          chip.innerHTML = `
+            <svg width="12" height="12" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+              <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"></path>
+              <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"></path>
+            </svg>
+            <span>${src.case_name} (Pg. ${src.page})</span>
+          `;
+          sourcesGrid.appendChild(chip);
+        });
+      } else {
+        const noSource = document.createElement('span');
+        noSource.style.color = 'var(--text-muted)';
+        noSource.style.fontSize = '0.85rem';
+        noSource.textContent = 'No specific sources cited.';
+        sourcesGrid.appendChild(noSource);
+      }
+
+      // 8. Expandable Chunks Details
+      chunksList.innerHTML = '';
+      if (data.chunks && data.chunks.length > 0) {
+        data.chunks.forEach((chunk, index) => {
+          const scorePercent = (chunk.similarity * 100).toFixed(1);
+          let scoreClass = 'green';
+          if (chunk.similarity < 0.6) {
+            scoreClass = 'red';
+          } else if (chunk.similarity < 0.8) {
+            scoreClass = 'yellow';
+          }
+          
+          const chunkItem = document.createElement('div');
+          chunkItem.className = 'chunk-item';
+          chunkItem.innerHTML = `
+            <div class="chunk-meta">
+              <span class="chunk-source">#${index+1} — <a href="/pdf/${encodeURIComponent(chunk.case_name)}#page=${chunk.page}" target="_blank" style="color: inherit; text-decoration: underline;">${chunk.case_name} (Page ${chunk.page})</a></span>
+              <span class="chunk-score ${scoreClass}">Similarity: ${scorePercent}%</span>
+            </div>
+            <pre class="chunk-preview">${escapeHtml(chunk.content)}</pre>
+          `;
+          chunksList.appendChild(chunkItem);
+        });
+      } else {
+        chunksList.innerHTML = '<div style="color: var(--text-muted);">No segments retrieved.</div>';
+      }
+    }
+
+    // Helper to escape HTML and prevent issues with case quotes/brackets
+    function escapeHtml(text) {
+      return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    // Check loaded database files on startup
+    window.addEventListener('DOMContentLoaded', loadFilesList);
+  </script>
+</body>
+</html>

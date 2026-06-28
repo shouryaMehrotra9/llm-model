@@ -1,0 +1,8 @@
+.env
+__pycache__/
+venv/
+.idea/
+.vscode/
+*.pyc
+court_cases_db/
+metadata.json
