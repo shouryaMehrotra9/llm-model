@@ -4,5 +4,4 @@ venv/
 .idea/
 .vscode/
 *.pyc
-court_cases_db/
 metadata.json
