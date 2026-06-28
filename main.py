@@ -483,6 +483,29 @@ async def startup_event():
             auto_index_pdfs()
         except Exception as e:
             logger.error(f"Error during auto-indexing on startup: {e}")
+
+        # 3. Backfill any chunks that were indexed while the embedder was offline
+        try:
+            with db_cursor() as cur:
+                cur.execute("SELECT COUNT(*) FROM legal_chunks WHERE embedding IS NULL")
+                null_count = cur.fetchone()[0]
+            if null_count > 0:
+                logger.info(f"Found {null_count} chunks with NULL embeddings. Starting backfill...")
+                with db_cursor() as cur:
+                    cur.execute("SELECT id, content FROM legal_chunks WHERE embedding IS NULL ORDER BY id")
+                    rows = cur.fetchall()
+                backfilled = 0
+                for chunk_id, content in rows:
+                    emb = embed_text(content)
+                    if emb:
+                        with db_cursor() as cur:
+                            cur.execute("UPDATE legal_chunks SET embedding = %s WHERE id = %s", (emb, chunk_id))
+                        backfilled += 1
+                logger.info(f"Embedding backfill complete: {backfilled}/{null_count} chunks embedded.")
+            else:
+                logger.info("All chunks already have embeddings. No backfill needed.")
+        except Exception as e:
+            logger.error(f"Error during embedding backfill on startup: {e}")
     else:
         logger.warning("Database connection pool is not initialized. Skipping schema checks and auto-indexing.")
 
