@@ -90,8 +90,8 @@ def embed_text(text: str) -> list[float] | None:
         return None
     
     # Prevent self-deadlock if the URL points to our own FastAPI port
-    if "localhost:8000" in EMBEDDER_URL or "127.0.0.1:8000" in EMBEDDER_URL:
-        logger.warning("EMBEDDER_URL points to localhost:8000. Skipping embedding call to avoid deadlock.")
+    if "localhost:5000" in EMBEDDER_URL or "127.0.0.1:5000" in EMBEDDER_URL:
+        logger.warning("EMBEDDER_URL points to localhost:5000. Skipping embedding call to avoid deadlock.")
         return None
         
     try:
@@ -328,12 +328,15 @@ def auto_index_pdfs():
                     
                 # Call Gemini chunker with fallback
                 chunks = None
-                for attempt in range(2):
-                    try:
-                        chunks = call_gemini_chunker(full_text)
-                        break
-                    except Exception as ex:
-                        logger.warning(f"Gemini chunker attempt {attempt+1} failed for {filename}: {ex}")
+                if len(full_text) > 150000:
+                    logger.warning(f"Document {filename} is extremely large ({len(full_text)} characters). Bypassing Gemini chunker directly to fallback splitter.")
+                else:
+                    for attempt in range(2):
+                        try:
+                            chunks = call_gemini_chunker(full_text)
+                            break
+                        except Exception as ex:
+                            logger.warning(f"Gemini chunker attempt {attempt+1} failed for {filename}: {ex}")
                         
                 if not chunks:
                     logger.warning(f"Falling back to character splitting for {filename}")
@@ -559,7 +562,7 @@ async def upload_files(files: List[UploadFile] = File(...)):
             if file.filename in existing_names:
                 raise HTTPException(status_code=400, detail=f"File '{file.filename}' has already been uploaded.")
                 
-            temp_file_path = os.path.join(temp_dir, file.filename)
+            temp_file_path = os.path.join(USER_PDFS_DIR, file.filename)
             with open(temp_file_path, "wb") as buffer:
                 shutil.copyfileobj(file.file, buffer)
                 
@@ -589,12 +592,15 @@ async def upload_files(files: List[UploadFile] = File(...)):
                     
                 # Call Gemini chunker
                 chunks = None
-                for attempt in range(2):
-                    try:
-                        chunks = call_gemini_chunker(full_text)
-                        break
-                    except Exception as ex:
-                        logger.warning(f"Gemini chunker failed during upload of {file.filename}: {ex}")
+                if len(full_text) > 150000:
+                    logger.warning(f"Document {file.filename} is extremely large ({len(full_text)} characters). Bypassing Gemini chunker directly to fallback splitter.")
+                else:
+                    for attempt in range(2):
+                        try:
+                            chunks = call_gemini_chunker(full_text)
+                            break
+                        except Exception as ex:
+                            logger.warning(f"Gemini chunker failed during upload of {file.filename}: {ex}")
                         
                 if not chunks:
                     logger.warning(f"Falling back to character splitting for {file.filename}")
@@ -634,8 +640,7 @@ async def upload_files(files: List[UploadFile] = File(...)):
                 existing_names.add(file.filename)
                 
             finally:
-                if os.path.exists(temp_file_path):
-                    os.remove(temp_file_path)
+                pass
                     
         # Update metadata.json
         save_metadata(current_files)
